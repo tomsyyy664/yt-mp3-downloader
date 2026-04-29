@@ -24,7 +24,7 @@ Descargador de audio desde YouTube con interfaz interactiva en terminal. Escrito
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/TU_USUARIO/yt-mp3-downloader.git
+git clone https://github.com/tomsyyy664/yt-mp3-downloader.git
 cd yt-mp3-downloader
 
 # Instalar dependencias con pnpm
@@ -94,6 +94,7 @@ Desde el menú **Configuración** puedes cambiar:
 | pnpm | Gestor de paquetes |
 
 ## 📦 Scripts
+Compruebe package.json
 
 ```bash
 pnpm build   # Compila TypeScript → dist/
@@ -101,7 +102,3 @@ pnpm start   # Ejecuta la versión compilada
 pnpm dev     # Ejecuta con ts-node (desarrollo)
 pnpm clean   # Limpia la carpeta dist/
 ```
-
-## 📝 Licencia
-
-MIT
