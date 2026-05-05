@@ -35,17 +35,34 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_CONFIG = void 0;
 exports.getDefaultOutputDir = getDefaultOutputDir;
+// src/config.ts — Configuración por defecto y paths de salida
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
+/**
+ * Detecta la carpeta real de Documentos en Windows.
+ * En Windows el sistema de ficheros usa "Documents" aunque el explorador
+ * lo muestre como "Documentos" según el idioma del sistema.
+ */
 function getDefaultOutputDir() {
     const home = os.homedir();
     const candidates = process.platform === "win32"
-        ? [path.join(home, "Documents", "songs"), path.join(home, "songs")]
-        : [path.join(home, "Documents", "songs"), path.join(home, "songs")];
+        ? [
+            path.join(home, "Documents", "songs"),
+            path.join(home, "Documentos", "songs"),
+            path.join(home, "Mis documentos", "songs"),
+            path.join(home, "songs"),
+        ]
+        : [
+            path.join(home, "Documents", "songs"),
+            path.join(home, "Documentos", "songs"),
+            path.join(home, "songs"),
+        ];
+    // Usar la primera cuyo directorio padre ya existe
     for (const candidate of candidates) {
-        if (fs.existsSync(path.dirname(candidate)))
+        if (fs.existsSync(path.dirname(candidate))) {
             return candidate;
+        }
     }
     return path.join(home, "songs");
 }
@@ -55,7 +72,7 @@ exports.DEFAULT_CONFIG = {
     quality: "0",
     includeIdInFilename: false,
     cookiesFromBrowser: "none",
-    playerClient: "web", // ARREGLO PASO 2
+    playerClient: "android",
     retries: 10,
 };
 //# sourceMappingURL=config.js.map

@@ -42,18 +42,21 @@ exports.downloadVideo = downloadVideo;
 exports.expandPlaylist = expandPlaylist;
 exports.downloadBatch = downloadBatch;
 exports.readUrlsFromFile = readUrlsFromFile;
+// src/downloader.ts — Lógica de descarga usando yt-dlp directamente
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const ytdlp_js_1 = require("./ytdlp.js");
-let ytdlpBin = null;
+// ─── Estado global: rutas de binarios ────────────────────────────────────────
+let bins = null;
 async function initYtDlp(onStatus) {
-    ytdlpBin = await (0, ytdlp_js_1.ensureYtDlp)(onStatus);
+    bins = await (0, ytdlp_js_1.ensureBinaries)(onStatus ?? (() => { }));
 }
-function getBin() {
-    if (!ytdlpBin)
-        throw new Error("yt-dlp no inicializado.");
-    return ytdlpBin;
+function getBins() {
+    if (!bins)
+        throw new Error("Binarios no inicializados. Llama a initYtDlp() primero.");
+    return bins;
 }
+// ─── Helpers de filesystem ────────────────────────────────────────────────────
 function ensureDir(dir) {
     if (!fs.existsSync(dir))
         fs.mkdirSync(dir, { recursive: true });
@@ -95,24 +98,65 @@ function alreadyDownloaded(dir, title, id, format, includeId) {
     ];
     return candidates.some(p => fs.existsSync(p));
 }
+// ─── Obtener info del vídeo ───────────────────────────────────────────────────
 async function fetchVideoInfo(url, config) {
-    const bin = getBin();
-    const base = { "dump-single-json": true, "no-warnings": true, "no-playlist": true };
-    if (config.cookiesFromBrowser !== "none")
+    const { ytdlp } = getBins();
+    const base = {
+        "dump-single-json": true,
+        "no-warnings": true,
+        "no-playlist": true,
+    };
+    if (config.cookiesFromBrowser !== "none") {
         base["cookies-from-browser"] = config.cookiesFromBrowser;
-    const stdout = await (0, ytdlp_js_1.runYtDlp)(bin, url, { ...base, "extractor-args": `youtube:player_client=${config.playerClient}` });
-    return (0, ytdlp_js_1.parseVideoInfo)(stdout);
+    }
+    const clients = ["android", "web", "tv_embedded", "mweb"];
+    let lastError = new Error("Sin respuesta de yt-dlp");
+    for (const client of clients) {
+        try {
+            const stdout = await (0, ytdlp_js_1.runYtDlp)(ytdlp, url, {
+                ...base,
+                "extractor-args": `youtube:player_client=${client}`,
+            });
+            return (0, ytdlp_js_1.parseVideoInfo)(stdout);
+        }
+        catch (err) {
+            lastError = err instanceof Error ? err : new Error(String(err));
+        }
+    }
+    // Último intento sin extractor-args
+    try {
+        const stdout = await (0, ytdlp_js_1.runYtDlp)(ytdlp, url, base);
+        return (0, ytdlp_js_1.parseVideoInfo)(stdout);
+    }
+    catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+    }
+    throw new Error(`No se pudo obtener informacion del video.\n` +
+        `Verifica la URL y tu conexion a internet.\n` +
+        `Ultimo error: ${lastError.message}`);
 }
+// ─── Descarga individual ──────────────────────────────────────────────────────
 async function downloadVideo(url, config, onProgress) {
-    const bin = getBin();
-    ensureDir(config.outputDir);
+    const { ytdlp, ffmpeg } = getBins();
+    try {
+        ensureDir(config.outputDir);
+    }
+    catch (err) {
+        return {
+            url, title: "Desconocido", status: "error",
+            errorMessage: `No se pudo crear la carpeta "${config.outputDir}": ${err instanceof Error ? err.message : String(err)}`,
+        };
+    }
     let info;
     try {
-        onProgress?.("Obteniendo información...");
+        onProgress?.("Obteniendo informacion del video...");
         info = await fetchVideoInfo(url, config);
     }
     catch (err) {
-        return { url, title: "Error", status: "error", errorMessage: String(err) };
+        return {
+            url, title: "Desconocido", status: "error",
+            errorMessage: err instanceof Error ? err.message : String(err),
+        };
     }
     const { id, title } = info;
     const baseName = buildOutputBaseName(title, id, config.includeIdInFilename);
@@ -122,46 +166,79 @@ async function downloadVideo(url, config, onProgress) {
     }
     try {
         onProgress?.(`Descargando: ${title}`);
-        // Buscamos la ruta real que entiende Windows
         const dlFlags = {
             "extract-audio": true,
-            "audio-format": "mp3",
-            "audio-quality": "0",
-            // Apunta al archivo que acabas de pegar en la raíz
-            "ffmpeg-location": path.resolve(process.cwd(), "ffmpeg.exe"),
-            "output": path.join(config.outputDir, "%(title)s.%(ext)s"),
+            "audio-format": config.format,
+            "audio-quality": config.quality,
+            "ffmpeg-location": ffmpeg, // <-- ruta real detectada/descargada
+            "output": path.join(config.outputDir, "%(id)s.%(ext)s"),
             "no-playlist": true,
-            "extractor-args": "youtube:player_client=web",
+            "extractor-args": `youtube:player_client=${config.playerClient}`,
             "retries": 5,
         };
-        if (config.cookiesFromBrowser !== "none")
+        if (config.cookiesFromBrowser !== "none") {
             dlFlags["cookies-from-browser"] = config.cookiesFromBrowser;
-        await (0, ytdlp_js_1.runYtDlp)(bin, url, dlFlags);
+        }
+        await (0, ytdlp_js_1.runYtDlp)(ytdlp, url, dlFlags);
         const tmpPath = path.join(config.outputDir, `${id}.${config.format}`);
-        if (fs.existsSync(tmpPath))
-            fs.renameSync(tmpPath, targetPath);
-        return { url, title, status: "success", outputPath: targetPath };
+        let finalPath = fs.existsSync(tmpPath)
+            ? tmpPath
+            : findLatestFileByExt(config.outputDir, config.format);
+        if (!finalPath || !fs.existsSync(finalPath)) {
+            throw new Error("No se encontro el archivo de audio tras la descarga.");
+        }
+        if (path.resolve(finalPath) !== path.resolve(targetPath)) {
+            try {
+                fs.renameSync(finalPath, targetPath);
+                finalPath = targetPath;
+            }
+            catch { /* usar path con ID */ }
+        }
+        return { url, title, status: "success", outputPath: finalPath };
     }
     catch (err) {
-        return { url, title, status: "error", errorMessage: String(err) };
+        return {
+            url, title, status: "error",
+            errorMessage: err instanceof Error ? err.message : String(err),
+        };
     }
 }
+// ─── Expansión de playlists ───────────────────────────────────────────────────
 async function expandPlaylist(url, config) {
-    const bin = getBin();
-    const stdout = await (0, ytdlp_js_1.runYtDlp)(bin, url, { "flat-playlist": true, "print": "%(id)s", "no-warnings": true });
-    return stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(id => `https://www.youtube.com/watch?v=${id}`);
+    const isPlaylist = /[?&]list=/.test(url) || /\/playlist\?/.test(url);
+    if (!isPlaylist)
+        return [url];
+    const { ytdlp } = getBins();
+    const flags = {
+        "flat-playlist": true,
+        "print": "%(id)s",
+        "no-warnings": true,
+    };
+    if (config.cookiesFromBrowser !== "none")
+        flags["cookies-from-browser"] = config.cookiesFromBrowser;
+    const stdout = await (0, ytdlp_js_1.runYtDlp)(ytdlp, url, flags);
+    return stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+        .map(id => `https://www.youtube.com/watch?v=${id}`);
 }
+// ─── Descarga en lote ─────────────────────────────────────────────────────────
 async function downloadBatch(urls, config, callbacks) {
     const results = [];
     for (let i = 0; i < urls.length; i++) {
-        callbacks.onStart?.(urls[i], i, urls.length);
-        const result = await downloadVideo(urls[i], config, callbacks.onProgress);
+        const url = urls[i].trim();
+        if (!url || url.startsWith("#"))
+            continue;
+        callbacks.onStart?.(url, i, urls.length);
+        const result = await downloadVideo(url, config, callbacks.onProgress);
         results.push(result);
         callbacks.onResult?.(result, i, urls.length);
     }
     return results;
 }
+// ─── Leer URLs desde archivo ──────────────────────────────────────────────────
 function readUrlsFromFile(filePath) {
-    return fs.readFileSync(filePath, "utf-8").split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+    if (!fs.existsSync(filePath))
+        throw new Error(`Archivo no encontrado: ${filePath}`);
+    return fs.readFileSync(filePath, "utf-8")
+        .split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#"));
 }
 //# sourceMappingURL=downloader.js.map

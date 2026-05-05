@@ -33,10 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ensureYtDlp = ensureYtDlp;
+exports.ensureBinaries = ensureBinaries;
 exports.runYtDlp = runYtDlp;
 exports.parseVideoInfo = parseVideoInfo;
-// src/ytdlp.ts — Wrapper que localiza o descarga yt-dlp automáticamente
+// src/ytdlp.ts — Localiza o descarga yt-dlp y ffmpeg automáticamente
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
@@ -44,64 +44,138 @@ const https = __importStar(require("https"));
 const child_process_1 = require("child_process");
 const util_1 = require("util");
 const execFileAsync = (0, util_1.promisify)(child_process_1.execFile);
+const execAsync = (0, util_1.promisify)(child_process_1.exec);
+const APP_DIR = path.join(os.homedir(), ".yt-mp3-downloader");
+const YTDLP_PATH = path.join(APP_DIR, "yt-dlp.exe");
+const FFMPEG_PATH = path.join(APP_DIR, "ffmpeg.exe");
 const YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
-const YTDLP_DIR = path.join(os.homedir(), ".yt-mp3-downloader");
-const YTDLP_PATH = path.join(YTDLP_DIR, "yt-dlp.exe");
-// ─── Descarga yt-dlp si no existe ────────────────────────────────────────────
-function downloadFile(url, dest) {
+const FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+// ─── Descarga un archivo siguiendo redirecciones ──────────────────────────────
+function downloadFile(url, dest, onProgress) {
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(dest);
-        const request = (redirectUrl) => {
-            https.get(redirectUrl, (res) => {
-                if (res.statusCode === 301 || res.statusCode === 302) {
-                    request(res.headers.location);
+        const follow = (currentUrl) => {
+            https.get(currentUrl, { headers: { "User-Agent": "yt-mp3-downloader/1.0" } }, (res) => {
+                if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) {
+                    follow(res.headers.location);
                     return;
                 }
                 if (res.statusCode !== 200) {
-                    reject(new Error(`HTTP ${res.statusCode} al descargar yt-dlp`));
+                    reject(new Error(`HTTP ${res.statusCode} descargando ${currentUrl}`));
                     return;
                 }
+                const total = parseInt(res.headers["content-length"] ?? "0", 10);
+                let received = 0;
+                const file = fs.createWriteStream(dest);
+                res.on("data", (chunk) => {
+                    received += chunk.length;
+                    if (total > 0)
+                        onProgress?.(Math.round((received / total) * 100));
+                });
                 res.pipe(file);
                 file.on("finish", () => file.close(() => resolve()));
-                file.on("error", reject);
+                file.on("error", (e) => { fs.unlink(dest, () => { }); reject(e); });
             }).on("error", reject);
         };
-        request(url);
+        follow(url);
     });
 }
-async function ensureYtDlp(onStatus) {
-    // 1. Buscar en ubicación propia (~/.yt-mp3-downloader/yt-dlp.exe)
-    if (fs.existsSync(YTDLP_PATH)) {
+// ─── Extraer ffmpeg.exe del zip usando PowerShell (sin dependencias extra) ───
+async function extractFfmpegFromZip(zipPath, destDir) {
+    // Usar PowerShell para descomprimir (disponible en Windows 5+)
+    await execAsync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destDir}' -Force"`);
+    // Buscar ffmpeg.exe dentro del zip extraído (puede estar en subcarpetas)
+    const findFfmpeg = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isFile() && entry.name === "ffmpeg.exe")
+                return fullPath;
+            if (entry.isDirectory()) {
+                const found = findFfmpeg(fullPath);
+                if (found)
+                    return found;
+            }
+        }
+        return null;
+    };
+    const tmpExtract = path.join(destDir, "_ffmpeg_extract");
+    fs.mkdirSync(tmpExtract, { recursive: true });
+    await execAsync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${tmpExtract}' -Force"`);
+    const ffmpegFound = findFfmpeg(tmpExtract);
+    if (!ffmpegFound)
+        throw new Error("ffmpeg.exe no encontrado dentro del zip.");
+    fs.copyFileSync(ffmpegFound, FFMPEG_PATH);
+    // Limpiar temporales
+    fs.rmSync(tmpExtract, { recursive: true, force: true });
+    fs.unlinkSync(zipPath);
+}
+// ─── Asegurar yt-dlp ──────────────────────────────────────────────────────────
+async function ensureYtDlpBin(onStatus) {
+    if (fs.existsSync(YTDLP_PATH))
         return YTDLP_PATH;
-    }
-    // 2. Buscar en node_modules (instalación normal)
-    const candidates = [
+    // Buscar en node_modules (instalación con npm)
+    const nmCandidates = [
         path.join(process.cwd(), "node_modules", "yt-dlp-exec", "bin", "yt-dlp.exe"),
+        // pnpm hoisted
         path.join(process.cwd(), "node_modules", ".pnpm", "yt-dlp-exec@1.0.2", "node_modules", "yt-dlp-exec", "bin", "yt-dlp.exe"),
     ];
-    for (const candidate of candidates) {
-        if (fs.existsSync(candidate))
-            return candidate;
+    for (const c of nmCandidates) {
+        if (fs.existsSync(c))
+            return c;
     }
-    // 3. Descargar automáticamente
-    onStatus?.("yt-dlp.exe no encontrado. Descargando desde GitHub…");
-    fs.mkdirSync(YTDLP_DIR, { recursive: true });
-    try {
-        await downloadFile(YTDLP_URL, YTDLP_PATH);
-        onStatus?.(`yt-dlp descargado en: ${YTDLP_PATH}`);
-        return YTDLP_PATH;
-    }
-    catch (err) {
-        throw new Error(`No se pudo descargar yt-dlp automáticamente.\n` +
-            `Descárgalo manualmente de https://github.com/yt-dlp/yt-dlp/releases\n` +
-            `y colócalo en: ${YTDLP_PATH}\n` +
-            `Error: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    onStatus("Descargando yt-dlp.exe desde GitHub...");
+    fs.mkdirSync(APP_DIR, { recursive: true });
+    await downloadFile(YTDLP_URL, YTDLP_PATH, (pct) => {
+        process.stdout.write(`\r  yt-dlp: ${pct}%   `);
+    });
+    process.stdout.write("\n");
+    onStatus(`yt-dlp descargado: ${YTDLP_PATH}`);
+    return YTDLP_PATH;
 }
-// ─── Ejecutar yt-dlp con flags ────────────────────────────────────────────────
+// ─── Asegurar ffmpeg ──────────────────────────────────────────────────────────
+async function ensureFfmpegBin(onStatus) {
+    if (fs.existsSync(FFMPEG_PATH))
+        return FFMPEG_PATH;
+    // Buscar ffmpeg en node_modules (ffmpeg-static)
+    const staticCandidates = [
+        path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg.exe"),
+        path.join(process.cwd(), "node_modules", ".pnpm", "ffmpeg-static@5.3.0", "node_modules", "ffmpeg-static", "ffmpeg.exe"),
+        path.join(process.cwd(), "node_modules", ".pnpm", "ffmpeg-static@5.2.0", "node_modules", "ffmpeg-static", "ffmpeg.exe"),
+    ];
+    for (const c of staticCandidates) {
+        if (fs.existsSync(c))
+            return c;
+    }
+    // Buscar en PATH del sistema
+    try {
+        const { stdout } = await execAsync("where ffmpeg");
+        const ffmpegSystem = stdout.trim().split("\n")[0].trim();
+        if (fs.existsSync(ffmpegSystem))
+            return ffmpegSystem;
+    }
+    catch { /* no está en PATH */ }
+    // Descargar
+    onStatus("Descargando ffmpeg desde GitHub (puede tardar unos minutos)...");
+    fs.mkdirSync(APP_DIR, { recursive: true });
+    const zipPath = path.join(APP_DIR, "ffmpeg.zip");
+    await downloadFile(FFMPEG_URL, zipPath, (pct) => {
+        process.stdout.write(`\r  ffmpeg: ${pct}%   `);
+    });
+    process.stdout.write("\n");
+    onStatus("Extrayendo ffmpeg.exe...");
+    await extractFfmpegFromZip(zipPath, APP_DIR);
+    onStatus(`ffmpeg descargado: ${FFMPEG_PATH}`);
+    return FFMPEG_PATH;
+}
+async function ensureBinaries(onStatus) {
+    const [ytdlp, ffmpeg] = await Promise.all([
+        ensureYtDlpBin(onStatus),
+        ensureFfmpegBin(onStatus),
+    ]);
+    return { ytdlp, ffmpeg };
+}
+// ─── Ejecutar yt-dlp ──────────────────────────────────────────────────────────
 async function runYtDlp(ytdlpPath, url, flags) {
     const args = [];
-    // Convertir flags a argumentos CLI
     for (const [key, value] of Object.entries(flags)) {
         if (value === true) {
             args.push(`--${key}`);
@@ -110,28 +184,31 @@ async function runYtDlp(ytdlpPath, url, flags) {
             args.push(`--${key}`, String(value));
         }
     }
-    // Añadir URLs
     if (Array.isArray(url)) {
         args.push(...url.filter(Boolean));
     }
     else if (url) {
         args.push(url);
     }
-    const { stdout, stderr } = await execFileAsync(ytdlpPath, args, {
-        maxBuffer: 50 * 1024 * 1024, // 50MB para JSON grandes
-    });
-    if (stderr && !flags["no-warnings"]) {
-        // Solo mostrar stderr si no es un warning esperado
+    try {
+        const { stdout } = await execFileAsync(ytdlpPath, args, {
+            maxBuffer: 50 * 1024 * 1024,
+        });
+        return stdout;
     }
-    return stdout;
+    catch (err) {
+        // Incluir stderr en el mensaje de error para diagnóstico
+        const detail = err.stderr ? `\n${err.stderr.substring(0, 500)}` : "";
+        throw new Error((err.message ?? String(err)) + detail);
+    }
 }
-// ─── Parsear JSON de dump-single-json ────────────────────────────────────────
 function parseVideoInfo(stdout) {
     try {
         return JSON.parse(stdout.trim());
     }
     catch {
-        throw new Error("No se pudo parsear la respuesta de yt-dlp. Respuesta: " + stdout.substring(0, 200));
+        throw new Error("No se pudo parsear la respuesta de yt-dlp.\n" +
+            "Respuesta recibida: " + stdout.substring(0, 300));
     }
 }
 //# sourceMappingURL=ytdlp.js.map

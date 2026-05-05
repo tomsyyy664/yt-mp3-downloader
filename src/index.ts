@@ -94,14 +94,14 @@ async function flowPlaylistDownload(): Promise<void> {
   printDivider();
 
   const results = await downloadBatch(videoUrls, config, {
-    onStart: (_url, i, total) => {
+    onStart: (_url: string, i: number, total: number) => {
       printProgress(`[${i + 1}/${total}] Procesando…`);
     },
-    onResult: (result, i, total) => {
+    onResult: (result: import("./types.js").DownloadResult, i: number, total: number) => {
       printDownloadResult(result);
       printDivider();
     },
-    onProgress: (msg) => {
+    onProgress: (msg: string) => {
       printProgress(msg);
     },
   });
@@ -169,14 +169,14 @@ async function flowBatchDownload(): Promise<void> {
   printDivider();
 
   const results = await downloadBatch(expandedUrls, config, {
-    onStart: (_url, i, total) => {
+    onStart: (_url: string, i: number, total: number) => {
       printProgress(`[${i + 1}/${total}] Procesando…`);
     },
-    onResult: (result) => {
+    onResult: (result: import("./types.js").DownloadResult) => {
       printDownloadResult(result);
       printDivider();
     },
-    onProgress: (msg) => {
+    onProgress: (msg: string) => {
       printProgress(msg);
     },
   });
@@ -268,4 +268,3 @@ main().catch((err) => {
   printError(`Error fatal: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });
-
