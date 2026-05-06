@@ -1,4 +1,4 @@
-// src/index.ts — Punto de entrada principal
+// src/index.ts -- Punto de entrada principal
 import { DEFAULT_CONFIG } from "./config.js";
 import {
   printBanner,
@@ -70,7 +70,7 @@ async function flowPlaylistDownload(): Promise<void> {
   }
 
   printDivider();
-  printProgress("Expandiendo playlist…");
+  printProgress("Expandiendo playlist...");
 
   let videoUrls: string[];
   try {
@@ -95,7 +95,7 @@ async function flowPlaylistDownload(): Promise<void> {
 
   const results = await downloadBatch(videoUrls, config, {
     onStart: (_url: string, i: number, total: number) => {
-      printProgress(`[${i + 1}/${total}] Procesando…`);
+      printProgress(`[${i + 1}/${total}] Procesando...`);
     },
     onResult: (result: import("./types.js").DownloadResult, i: number, total: number) => {
       printDownloadResult(result);
@@ -150,7 +150,7 @@ async function flowBatchDownload(): Promise<void> {
   }
 
   // Expandir playlists que puedan estar en el archivo
-  printProgress("Expandiendo playlists si las hay…");
+  printProgress("Expandiendo playlists si las hay...");
   const expandedUrls: string[] = [];
   for (const url of urls) {
     try {
@@ -170,7 +170,7 @@ async function flowBatchDownload(): Promise<void> {
 
   const results = await downloadBatch(expandedUrls, config, {
     onStart: (_url: string, i: number, total: number) => {
-      printProgress(`[${i + 1}/${total}] Procesando…`);
+      printProgress(`[${i + 1}/${total}] Procesando...`);
     },
     onResult: (result: import("./types.js").DownloadResult) => {
       printDownloadResult(result);
@@ -219,6 +219,29 @@ function printSummary(results: DownloadResult[]): void {
   if (errors > 0) printError(`  ${errors} errores`);
 }
 
+
+// ─── Flujo: busqueda por nombre ──────────────────────────────────────────────
+
+async function flowSpotifyDownload(): Promise<void> {
+  printBanner();
+  printInfo("Busqueda por nombre de cancion");
+  printInfo("Escribe el nombre de la cancion y artista para buscarla en YouTube.");
+  printInfo("Ejemplo: Bad Bunny - 120");
+  printDivider();
+
+  const query = await promptInput("Nombre de la cancion (artista - titulo)");
+  if (!query) { printWarning("No se introdujo nada."); await pressAnyKey(); return; }
+
+  ensureDir(config.outputDir);
+  printDivider();
+  printProgress("Buscando en YouTube: " + query);
+
+  const result = await downloadVideo("ytsearch1:" + query + " audio", config, (msg: string) => printProgress(msg));
+  printDownloadResult(result);
+  printInfo("Carpeta: " + config.outputDir);
+  await pressAnyKey();
+}
+
 // ─── Loop principal ──────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -251,6 +274,10 @@ async function main(): Promise<void> {
 
       case "batch":
         await flowBatchDownload();
+        break;
+
+      case "spotify":
+        await flowSpotifyDownload();
         break;
 
       case "config":

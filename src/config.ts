@@ -1,4 +1,4 @@
-// src/config.ts — Configuración por defecto y paths de salida
+// src/config.ts -- Configuración por defecto y paths de salida
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";

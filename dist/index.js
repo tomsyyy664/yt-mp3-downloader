@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-// src/index.ts — Punto de entrada principal
+// src/index.ts -- Punto de entrada principal
 const config_js_1 = require("./config.js");
 const ui_js_1 = require("./ui.js");
 const downloader_js_1 = require("./downloader.js");
@@ -38,7 +38,7 @@ async function flowPlaylistDownload() {
         return;
     }
     (0, ui_js_1.printDivider)();
-    (0, ui_js_1.printProgress)("Expandiendo playlist…");
+    (0, ui_js_1.printProgress)("Expandiendo playlist...");
     let videoUrls;
     try {
         videoUrls = await (0, downloader_js_1.expandPlaylist)(url, config);
@@ -59,7 +59,7 @@ async function flowPlaylistDownload() {
     (0, ui_js_1.printDivider)();
     const results = await (0, downloader_js_1.downloadBatch)(videoUrls, config, {
         onStart: (_url, i, total) => {
-            (0, ui_js_1.printProgress)(`[${i + 1}/${total}] Procesando…`);
+            (0, ui_js_1.printProgress)(`[${i + 1}/${total}] Procesando...`);
         },
         onResult: (result, i, total) => {
             printDownloadResult(result);
@@ -104,7 +104,7 @@ async function flowBatchDownload() {
         return;
     }
     // Expandir playlists que puedan estar en el archivo
-    (0, ui_js_1.printProgress)("Expandiendo playlists si las hay…");
+    (0, ui_js_1.printProgress)("Expandiendo playlists si las hay...");
     const expandedUrls = [];
     for (const url of urls) {
         try {
@@ -122,7 +122,7 @@ async function flowBatchDownload() {
     (0, ui_js_1.printDivider)();
     const results = await (0, downloader_js_1.downloadBatch)(expandedUrls, config, {
         onStart: (_url, i, total) => {
-            (0, ui_js_1.printProgress)(`[${i + 1}/${total}] Procesando…`);
+            (0, ui_js_1.printProgress)(`[${i + 1}/${total}] Procesando...`);
         },
         onResult: (result) => {
             printDownloadResult(result);
@@ -167,6 +167,27 @@ function printSummary(results) {
     if (errors > 0)
         (0, ui_js_1.printError)(`  ${errors} errores`);
 }
+// ─── Flujo: busqueda por nombre ──────────────────────────────────────────────
+async function flowSpotifyDownload() {
+    (0, ui_js_1.printBanner)();
+    (0, ui_js_1.printInfo)("Busqueda por nombre de cancion");
+    (0, ui_js_1.printInfo)("Escribe el nombre de la cancion y artista para buscarla en YouTube.");
+    (0, ui_js_1.printInfo)("Ejemplo: Bad Bunny - 120");
+    (0, ui_js_1.printDivider)();
+    const query = await (0, ui_js_1.promptInput)("Nombre de la cancion (artista - titulo)");
+    if (!query) {
+        (0, ui_js_1.printWarning)("No se introdujo nada.");
+        await (0, ui_js_1.pressAnyKey)();
+        return;
+    }
+    (0, downloader_js_1.ensureDir)(config.outputDir);
+    (0, ui_js_1.printDivider)();
+    (0, ui_js_1.printProgress)("Buscando en YouTube: " + query);
+    const result = await (0, downloader_js_1.downloadVideo)("ytsearch1:" + query + " audio", config, (msg) => (0, ui_js_1.printProgress)(msg));
+    printDownloadResult(result);
+    (0, ui_js_1.printInfo)("Carpeta: " + config.outputDir);
+    await (0, ui_js_1.pressAnyKey)();
+}
 // ─── Loop principal ──────────────────────────────────────────────────────────
 async function main() {
     (0, ui_js_1.printBanner)();
@@ -193,6 +214,9 @@ async function main() {
                 break;
             case "batch":
                 await flowBatchDownload();
+                break;
+            case "spotify":
+                await flowSpotifyDownload();
                 break;
             case "config":
                 config = await (0, configScreen_js_1.showConfigScreen)(config);

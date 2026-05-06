@@ -17,7 +17,7 @@ exports.selectBrowser = selectBrowser;
 exports.promptInput = promptInput;
 exports.confirm = confirm;
 exports.pressAnyKey = pressAnyKey;
-// src/ui.ts — Interfaz de terminal con terminal-kit
+// src/ui.ts -- Interfaz de terminal con terminal-kit
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const termkit = require("terminal-kit");
 const term = termkit.terminal;
@@ -46,16 +46,17 @@ function exitApp() {
 async function showMainMenu() {
     term.bold.white("\n  Que quieres hacer?\n\n");
     const items = [
-        "  Descargar un video individual",
-        "  Descargar una playlist completa",
+        "  Descargar un video de YouTube",
+        "  Descargar una playlist de YouTube",
         "  Descargar desde lista de URLs (.txt)",
+        "  Buscar cancion por nombre (rapido)",
         "  Configuracion",
         "  Salir",
     ];
     return new Promise((resolve) => {
         term.singleColumnMenu(items, { leftPadding: "  " }, (_err, response) => {
             const map = {
-                0: "single", 1: "playlist", 2: "batch", 3: "config", 4: "exit",
+                0: "single", 1: "playlist", 2: "batch", 3: "spotify", 4: "config", 5: "exit",
             };
             resolve(map[response.selectedIndex] ?? "exit");
         });

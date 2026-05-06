@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ensureBinaries = ensureBinaries;
 exports.runYtDlp = runYtDlp;
 exports.parseVideoInfo = parseVideoInfo;
-// src/ytdlp.ts — Localiza o descarga yt-dlp y ffmpeg automáticamente
+// src/ytdlp.ts -- Localiza o descarga yt-dlp y ffmpeg automáticamente
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));

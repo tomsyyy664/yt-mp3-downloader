@@ -1,4 +1,4 @@
-// src/ui.ts — Interfaz de terminal con terminal-kit
+// src/ui.ts -- Interfaz de terminal con terminal-kit
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const termkit = require("terminal-kit");
 const term: any = termkit.terminal;
@@ -31,19 +31,20 @@ export function exitApp(): void {
 
 // ─── Menús interactivos ──────────────────────────────────────────────────────
 
-export async function showMainMenu(): Promise<"single" | "playlist" | "batch" | "config" | "exit"> {
+export async function showMainMenu(): Promise<"single" | "playlist" | "batch" | "spotify" | "config" | "exit"> {
   term.bold.white("\n  Que quieres hacer?\n\n");
   const items = [
-    "  Descargar un video individual",
-    "  Descargar una playlist completa",
+    "  Descargar un video de YouTube",
+    "  Descargar una playlist de YouTube",
     "  Descargar desde lista de URLs (.txt)",
+    "  Buscar cancion por nombre (rapido)",
     "  Configuracion",
     "  Salir",
   ];
   return new Promise((resolve) => {
     term.singleColumnMenu(items, { leftPadding: "  " }, (_err: any, response: any) => {
-      const map: Record<number, "single" | "playlist" | "batch" | "config" | "exit"> = {
-        0: "single", 1: "playlist", 2: "batch", 3: "config", 4: "exit",
+      const map: Record<number, "single" | "playlist" | "batch" | "spotify" | "config" | "exit"> = {
+        0: "single", 1: "playlist", 2: "batch", 3: "spotify", 4: "config", 5: "exit",
       };
       resolve(map[response.selectedIndex] ?? "exit");
     });

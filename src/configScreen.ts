@@ -1,4 +1,4 @@
-// src/configScreen.ts — Pantalla de configuración interactiva
+// src/configScreen.ts -- Pantalla de configuración interactiva
 import * as path from "path";
 import type { DownloadConfig } from "./types.js";
 import {

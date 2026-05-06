@@ -1,11 +1,10 @@
-// src/downloader.ts — Lógica de descarga usando yt-dlp directamente
+// src/downloader.ts
 import * as fs from "fs";
 import * as path from "path";
 import { ensureBinaries, runYtDlp, parseVideoInfo } from "./ytdlp.js";
 import type { Binaries } from "./ytdlp.js";
 import type { DownloadConfig, DownloadResult, VideoInfo } from "./types.js";
 
-// ─── Estado global: rutas de binarios ────────────────────────────────────────
 let bins: Binaries | null = null;
 
 export async function initYtDlp(onStatus?: (msg: string) => void): Promise<void> {
@@ -13,11 +12,9 @@ export async function initYtDlp(onStatus?: (msg: string) => void): Promise<void>
 }
 
 function getBins(): Binaries {
-  if (!bins) throw new Error("Binarios no inicializados. Llama a initYtDlp() primero.");
+  if (!bins) throw new Error("Binarios no inicializados.");
   return bins;
 }
-
-// ─── Helpers de filesystem ────────────────────────────────────────────────────
 
 export function ensureDir(dir: string): void {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -58,11 +55,8 @@ export function alreadyDownloaded(dir: string, title: string, id: string, format
   return candidates.some(p => fs.existsSync(p));
 }
 
-// ─── Obtener info del vídeo ───────────────────────────────────────────────────
-
 async function fetchVideoInfo(url: string, config: DownloadConfig): Promise<VideoInfo> {
   const { ytdlp } = getBins();
-
   const base: Record<string, unknown> = {
     "dump-single-json": true,
     "no-warnings": true,
@@ -87,7 +81,6 @@ async function fetchVideoInfo(url: string, config: DownloadConfig): Promise<Vide
     }
   }
 
-  // Último intento sin extractor-args
   try {
     const stdout = await runYtDlp(ytdlp, url, base);
     return parseVideoInfo(stdout) as unknown as VideoInfo;
@@ -96,13 +89,11 @@ async function fetchVideoInfo(url: string, config: DownloadConfig): Promise<Vide
   }
 
   throw new Error(
-    `No se pudo obtener informacion del video.\n` +
-    `Verifica la URL y tu conexion a internet.\n` +
+    "No se pudo obtener informacion del video. " +
+    "Verifica la URL y tu conexion a internet. " +
     `Ultimo error: ${lastError.message}`
   );
 }
-
-// ─── Descarga individual ──────────────────────────────────────────────────────
 
 export async function downloadVideo(
   url: string,
@@ -146,7 +137,7 @@ export async function downloadVideo(
       "extract-audio": true,
       "audio-format": config.format,
       "audio-quality": config.quality,
-      "ffmpeg-location": ffmpeg,           // <-- ruta real detectada/descargada
+      "ffmpeg-location": ffmpeg,
       "output": path.join(config.outputDir, "%(id)s.%(ext)s"),
       "no-playlist": true,
       "extractor-args": `youtube:player_client=${config.playerClient}`,
@@ -168,7 +159,7 @@ export async function downloadVideo(
     }
 
     if (path.resolve(finalPath) !== path.resolve(targetPath)) {
-      try { fs.renameSync(finalPath, targetPath); finalPath = targetPath; } catch { /* usar path con ID */ }
+      try { fs.renameSync(finalPath, targetPath); finalPath = targetPath; } catch { /* ok */ }
     }
 
     return { url, title, status: "success", outputPath: finalPath };
@@ -179,8 +170,6 @@ export async function downloadVideo(
     };
   }
 }
-
-// ─── Expansión de playlists ───────────────────────────────────────────────────
 
 export async function expandPlaylist(url: string, config: DownloadConfig): Promise<string[]> {
   const isPlaylist = /[?&]list=/.test(url) || /\/playlist\?/.test(url);
@@ -195,11 +184,9 @@ export async function expandPlaylist(url: string, config: DownloadConfig): Promi
   if (config.cookiesFromBrowser !== "none") flags["cookies-from-browser"] = config.cookiesFromBrowser;
 
   const stdout = await runYtDlp(ytdlp, url, flags);
-  return stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean)
-    .map(id => `https://www.youtube.com/watch?v=${id}`);
+  return stdout.split(/\r?\n/).map((s: string) => s.trim()).filter(Boolean)
+    .map((id: string) => `https://www.youtube.com/watch?v=${id}`);
 }
-
-// ─── Descarga en lote ─────────────────────────────────────────────────────────
 
 export async function downloadBatch(
   urls: string[],
@@ -222,10 +209,8 @@ export async function downloadBatch(
   return results;
 }
 
-// ─── Leer URLs desde archivo ──────────────────────────────────────────────────
-
 export function readUrlsFromFile(filePath: string): string[] {
   if (!fs.existsSync(filePath)) throw new Error(`Archivo no encontrado: ${filePath}`);
   return fs.readFileSync(filePath, "utf-8")
-    .split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+    .split(/\r?\n/).map((l: string) => l.trim()).filter((l: string) => l && !l.startsWith("#"));
 }

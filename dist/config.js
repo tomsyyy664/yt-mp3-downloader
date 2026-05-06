@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_CONFIG = void 0;
 exports.getDefaultOutputDir = getDefaultOutputDir;
-// src/config.ts — Configuración por defecto y paths de salida
+// src/config.ts -- Configuración por defecto y paths de salida
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));

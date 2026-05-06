@@ -1,4 +1,4 @@
-// src/ytdlp.ts — Localiza o descarga yt-dlp y ffmpeg automáticamente
+// src/ytdlp.ts -- Localiza o descarga yt-dlp y ffmpeg automáticamente
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";

@@ -1,4 +1,4 @@
-// src/types.ts — Tipos robustos para el proyecto
+// src/types.ts -- Tipos robustos para el proyecto
 
 export type AudioFormat = "mp3" | "wav" | "flac" | "aac" | "opus";
 export type AudioQuality = "0" | "1" | "2" | "3" | "4" | "5";
@@ -12,6 +12,7 @@ export interface DownloadConfig {
   cookiesFromBrowser: "chrome" | "firefox" | "edge" | "none";
   playerClient: PlayerClient;
   retries: number;
+  spotify?: SpotifyCredentials;
 }
 
 export interface VideoInfo {
@@ -59,3 +60,8 @@ export interface MenuOption {
 }
 
 export type ConfirmResult = "yes" | "no";
+
+export interface SpotifyCredentials {
+  clientId: string;
+  clientSecret: string;
+}

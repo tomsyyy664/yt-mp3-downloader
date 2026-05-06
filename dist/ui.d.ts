@@ -8,7 +8,7 @@ export declare function printProgress(msg: string): void;
 export declare function printSkipped(msg: string): void;
 export declare function printDivider(): void;
 export declare function exitApp(): void;
-export declare function showMainMenu(): Promise<"single" | "playlist" | "batch" | "config" | "exit">;
+export declare function showMainMenu(): Promise<"single" | "playlist" | "batch" | "spotify" | "config" | "exit">;
 export declare function selectFormat(): Promise<"mp3" | "wav" | "flac" | "aac" | "opus">;
 export declare function selectQuality(): Promise<"0" | "1" | "2" | "3" | "4" | "5">;
 export declare function selectBrowser(): Promise<"chrome" | "firefox" | "edge" | "none">;

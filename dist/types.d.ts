@@ -9,6 +9,7 @@ export interface DownloadConfig {
     cookiesFromBrowser: "chrome" | "firefox" | "edge" | "none";
     playerClient: PlayerClient;
     retries: number;
+    spotify?: SpotifyCredentials;
 }
 export interface VideoInfo {
     id: string;
@@ -51,4 +52,8 @@ export interface MenuOption {
     value: string;
 }
 export type ConfirmResult = "yes" | "no";
+export interface SpotifyCredentials {
+    clientId: string;
+    clientSecret: string;
+}
 //# sourceMappingURL=types.d.ts.map
