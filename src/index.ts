@@ -24,6 +24,7 @@ import {
   initYtDlp,
 } from "./downloader.js";
 import { showConfigScreen } from "./configScreen.js";
+import { flushAppDir, APP_DIR } from "./ytdlp.js";
 import type { DownloadConfig, DownloadResult } from "./types.js";
 
 // ─── Estado de la app ────────────────────────────────────────────────────────
@@ -245,6 +246,30 @@ async function flowSpotifyDownload(): Promise<void> {
 // ─── Loop principal ──────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  const cliArgs = process.argv.slice(2);
+
+  if (cliArgs.includes("--flush-hdir")) {
+    flushAppDir();
+  process.stdout.write("Directorio limpiado: " + APP_DIR + "\n");
+
+    process.exit(0);
+  }
+
+  if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
+    process.stdout.write([
+      "",
+      "  yt-mp3-downloader",
+      "",
+      "  Uso: node dist/index.js [opciones]",
+      "",
+      "  Opciones:",
+      "    --flush-hdir   Limpia ~/.yt-mp3-downloader (binarios descargados)",
+      "    --help, -h     Muestra esta ayuda",
+      "",
+    ].join("\n") + "\n");
+    process.exit(0);
+  }
+
   printBanner();
   printInfo("Iniciando... comprobando yt-dlp\n");
 

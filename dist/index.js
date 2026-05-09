@@ -5,6 +5,7 @@ const config_js_1 = require("./config.js");
 const ui_js_1 = require("./ui.js");
 const downloader_js_1 = require("./downloader.js");
 const configScreen_js_1 = require("./configScreen.js");
+const ytdlp_js_1 = require("./ytdlp.js");
 // ─── Estado de la app ────────────────────────────────────────────────────────
 let config = { ...config_js_1.DEFAULT_CONFIG };
 // ─── Flujo: descarga individual ──────────────────────────────────────────────
@@ -190,6 +191,26 @@ async function flowSpotifyDownload() {
 }
 // ─── Loop principal ──────────────────────────────────────────────────────────
 async function main() {
+    const cliArgs = process.argv.slice(2);
+    if (cliArgs.includes("--flush-hdir")) {
+        (0, ytdlp_js_1.flushAppDir)();
+        process.stdout.write("Directorio limpiado: " + ytdlp_js_1.APP_DIR + "\n");
+        process.exit(0);
+    }
+    if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
+        process.stdout.write([
+            "",
+            "  yt-mp3-downloader",
+            "",
+            "  Uso: node dist/index.js [opciones]",
+            "",
+            "  Opciones:",
+            "    --flush-hdir   Limpia ~/.yt-mp3-downloader (binarios descargados)",
+            "    --help, -h     Muestra esta ayuda",
+            "",
+        ].join("\n") + "\n");
+        process.exit(0);
+    }
     (0, ui_js_1.printBanner)();
     (0, ui_js_1.printInfo)("Iniciando... comprobando yt-dlp\n");
     try {

@@ -7,9 +7,16 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "flush": "node dist/index.js --flush-hdir"
   },
-  "keywords": ["youtube", "mp3", "downloader", "yt-dlp", "terminal"],
+  "keywords": [
+    "youtube",
+    "mp3",
+    "downloader",
+    "yt-dlp",
+    "terminal"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
